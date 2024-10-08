@@ -6,6 +6,7 @@ import java.security.KeyStore;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
+import com.silkimen.http.CustomTrustManager;
 import com.silkimen.http.TLSConfiguration;
 
 import org.apache.cordova.CallbackContext;
@@ -22,6 +23,8 @@ import javax.net.ssl.X509TrustManager;
 
 class CordovaServerTrust implements Runnable {
   private static final String TAG = "Cordova-Plugin-HTTP";
+
+  // Your expected public key in Base64 format 6951436dad8b6981288254e0e7b63bf5ad7765916164a93c9e8267ee21c9b575
 
   private final TrustManager[] noOpTrustManagers;
   private final HostnameVerifier noOpVerifier;
@@ -71,7 +74,10 @@ class CordovaServerTrust implements Runnable {
         this.tlsConfiguration.setTrustManagers(this.noOpTrustManagers);
       } else if ("pinned".equals(this.mode)) {
         this.tlsConfiguration.setHostnameVerifier(null);
-        this.tlsConfiguration.setTrustManagers(this.getTrustManagers(this.getCertsFromBundle(getWebAssetDir() + "/certificates")));
+        //X509TrustManager originalTrustManager = (X509TrustManager) tmf.getTrustManagers()[0];
+       // TrustManager[] customTrustManagers = new TrustManager[]{new CustomTrustManager(originalTrustManager, EXPECTED_PUBLIC_KEY)};
+       // this.tlsConfiguration.setTrustManagers(customTrustManagers);
+        //this.tlsConfiguration.setTrustManagers(this.getTrustManagers(this.getCertsFromBundle(getWebAssetDir() + "/certificates")));
       } else {
         this.tlsConfiguration.setHostnameVerifier(null);
         this.tlsConfiguration.setTrustManagers(this.getTrustManagers(this.getCertsFromKeyStore("AndroidCAStore")));
