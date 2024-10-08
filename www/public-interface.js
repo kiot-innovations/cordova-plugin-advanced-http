@@ -21,6 +21,7 @@ module.exports = function init(exec, cookieHandler, urlUtil, helpers, globalConf
     getReadTimeout: getReadTimeout,
     setReadTimeout: setReadTimeout,
     setServerTrustMode: setServerTrustMode,
+    setPublicKey: setPublicKey,
     setClientAuthMode: setClientAuthMode,
     sendRequest: sendRequest,
     post: post,
@@ -135,6 +136,10 @@ module.exports = function init(exec, cookieHandler, urlUtil, helpers, globalConf
     helpers.handleMissingCallbacks(success, failure);
 
     return exec(success, failure, 'CordovaHttpPlugin', 'setServerTrustMode', [helpers.checkSSLCertMode(mode)]);
+  }
+
+  function setPublicKey(publicKey, success, failure) {
+    return exec(success, failure, 'CordovaHttpPlugin', 'setPublicKey',[publicKey]);
   }
 
   function setClientAuthMode() {

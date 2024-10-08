@@ -9,6 +9,8 @@
 
 @interface CordovaHttpPlugin()
 
+
+
 - (void)addRequest:(NSNumber*)reqId forTask:(NSURLSessionDataTask*)task;
 - (void)removeRequest:(NSNumber*)reqId;
 - (void)setRequestHeaders:(NSDictionary*)headers forManager:(SM_AFHTTPSessionManager*)manager;
@@ -26,6 +28,9 @@
     NSURLCredential *x509Credential;
     NSMutableDictionary *reqDict;
 }
+
+// Optionally synthesize the property
+@synthesize expectedPublicKey = _expectedPublicKey;
 
 - (void)pluginInitialize {
     securityPolicy = [SM_AFSecurityPolicy policyWithPinningMode:AFSSLPinningModeNone];
@@ -58,26 +63,73 @@
         NSURLAuthenticationChallenge * _Nonnull challenge,
         NSURLCredential * _Nullable __autoreleasing * _Nullable credential
     ) {
-        if ([challenge.protectionSpace.authenticationMethod isEqualToString: NSURLAuthenticationMethodServerTrust]) {
-            *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
-
-            if (![self->securityPolicy evaluateServerTrust:challenge.protectionSpace.serverTrust forDomain:challenge.protectionSpace.host]) {
-                return NSURLSessionAuthChallengeRejectProtectionSpace;
-            }
-
-            if (credential) {
+        // Handle server trust
+        if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
+            SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
+            SecCertificateRef certificate = SecTrustGetCertificateAtIndex(serverTrust, 0);
+            
+            // Extract public key
+            NSData *publicKeyData = [self getPublicKeyDataFromCertificate:certificate];
+            NSString *publicKeyString = [publicKeyData base64EncodedStringWithOptions:0];
+            
+            // Expected public key (replace this with the actual key you send from the app)
+            NSString *expectedPublicKey = self.expectedPublicKey; // This should be set dynamically from your app
+            
+            if ([self.expectedPublicKey rangeOfString:publicKeyString].location != NSNotFound) {
+                // Public key matches, proceed with the trust
+                *credential = [NSURLCredential credentialForTrust:serverTrust];
                 return NSURLSessionAuthChallengeUseCredential;
+            } else {
+                // Public key mismatch, reject the connection
+                return NSURLSessionAuthChallengeCancelAuthenticationChallenge;
             }
         }
 
-        if ([challenge.protectionSpace.authenticationMethod isEqualToString: NSURLAuthenticationMethodClientCertificate] && self->x509Credential) {
-            *credential = self->x509Credential;
-            return NSURLSessionAuthChallengeUseCredential;
-        }
-
+        // For other authentication methods
         return NSURLSessionAuthChallengePerformDefaultHandling;
     }];
 }
+
+- (NSData *)getPublicKeyDataFromCertificate:(SecCertificateRef)certificate {
+    SecKeyRef publicKey = SecCertificateCopyKey(certificate);
+    NSData *publicKeyData = (__bridge_transfer NSData *)SecKeyCopyExternalRepresentation(publicKey, NULL);
+    if (publicKey) {
+        CFRelease(publicKey);
+    }
+    return publicKeyData;
+}
+
+- (void)setPublicKey:(CDVInvokedUrlCommand*)command {
+    NSString *publicKey = [command.arguments objectAtIndex:0];
+    self.expectedPublicKey = publicKey;  // Store the public key in a property
+}
+
+//- (void)setupAuthChallengeBlock:(SM_AFHTTPSessionManager*)manager {
+//    [manager setSessionDidReceiveAuthenticationChallengeBlock:^NSURLSessionAuthChallengeDisposition(
+//        NSURLSession * _Nonnull session,
+//        NSURLAuthenticationChallenge * _Nonnull challenge,
+//        NSURLCredential * _Nullable __autoreleasing * _Nullable credential
+//    ) {
+//        if ([challenge.protectionSpace.authenticationMethod isEqualToString: NSURLAuthenticationMethodServerTrust]) {
+//            *credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
+//
+//            if (![self->securityPolicy evaluateServerTrust:challenge.protectionSpace.serverTrust forDomain:challenge.protectionSpace.host]) {
+//                return NSURLSessionAuthChallengeRejectProtectionSpace;
+//            }
+//
+//            if (credential) {
+//                return NSURLSessionAuthChallengeUseCredential;
+//            }
+//        }
+//
+//        if ([challenge.protectionSpace.authenticationMethod isEqualToString: NSURLAuthenticationMethodClientCertificate] && self->x509Credential) {
+//            *credential = self->x509Credential;
+//            return NSURLSessionAuthChallengeUseCredential;
+//        }
+//
+//        return NSURLSessionAuthChallengePerformDefaultHandling;
+//    }];
+//}
 
 - (void)setRequestHeaders:(NSDictionary*)headers forManager:(SM_AFHTTPSessionManager*)manager {
     [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
@@ -266,12 +318,12 @@
     NSString *responseType = [command.arguments objectAtIndex:7];
     NSNumber *reqId = [command.arguments objectAtIndex:8];
 
-    [self setRequestSerializer: serializerName forManager: manager];
+    [self setRequestSerializer: @"json" forManager: manager];
     [self setupAuthChallengeBlock: manager];
     [self setRequestHeaders: headers forManager: manager];
     [self setTimeout:readTimeout forManager:manager];
     [self setRedirect:followRedirect forManager:manager];
-    [self setResponseSerializer:responseType forManager:manager];
+    [self setResponseSerializer:@"json" forManager:manager];
 
     CordovaHttpPlugin* __weak weakSelf = self;
     [[SDNetworkActivityIndicator sharedActivityIndicator] startActivity];

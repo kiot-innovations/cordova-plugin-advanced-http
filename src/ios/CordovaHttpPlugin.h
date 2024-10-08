@@ -3,7 +3,10 @@
 #import <Cordova/CDVPlugin.h>
 
 @interface CordovaHttpPlugin : CDVPlugin
+@property (nonatomic, strong) NSString *expectedPublicKey; // Declare the property
 
+// Other properties and methods...
+- (void)setPublicKey:(CDVInvokedUrlCommand*)command;
 - (void)setServerTrustMode:(CDVInvokedUrlCommand*)command;
 - (void)setClientAuthMode:(CDVInvokedUrlCommand*)command;
 - (void)post:(CDVInvokedUrlCommand*)command;

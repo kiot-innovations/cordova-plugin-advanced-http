@@ -6,6 +6,7 @@ import java.util.Observable;
 import java.util.Observer;
 import java.util.concurrent.Future;
 
+import com.silkimen.http.CustomTrustManager;
 import com.silkimen.http.TLSConfiguration;
 
 import org.apache.cordova.CallbackContext;
@@ -23,6 +24,8 @@ import android.util.Log;
 import android.util.Base64;
 
 import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.TrustManager;
 
 public class CordovaHttpPlugin extends CordovaPlugin implements Observer {
   private static final String TAG = "Cordova-Plugin-HTTP";
@@ -31,6 +34,10 @@ public class CordovaHttpPlugin extends CordovaPlugin implements Observer {
 
   private HashMap<Integer, Future<?>> reqMap;
   private final Object reqMapLock = new Object();
+
+  // Your expected public key in Base64 format 6951436dad8b6981288254e0e7b63bf5ad7765916164a93c9e8267ee21c9b575
+  private static final String EXPECTED_PUBLIC_KEY = "";
+  //"aVFDba2LaYEoglTg57Y79a13ZZFhZKk8noJn7iHJtXU=";
 
   @Override
   public void initialize(CordovaInterface cordova, CordovaWebView webView) {
@@ -47,8 +54,11 @@ public class CordovaHttpPlugin extends CordovaPlugin implements Observer {
 
       store.load(null);
       tmf.init(store);
+      // X509TrustManager originalTrustManager = (X509TrustManager) tmf.getTrustManagers()[0];
+      // TrustManager[] customTrustManagers = new TrustManager[]{new CustomTrustManager(originalTrustManager, EXPECTED_PUBLIC_KEY)};
 
       this.tlsConfiguration.setHostnameVerifier(null);
+     // this.tlsConfiguration.setTrustManagers(customTrustManagers);
       this.tlsConfiguration.setTrustManagers(tmf.getTrustManagers());
 
       if (this.preferences.contains("androidblacklistsecuresocketprotocols")) {
@@ -76,6 +86,8 @@ public class CordovaHttpPlugin extends CordovaPlugin implements Observer {
       return this.setClientAuthMode(args, callbackContext);
     } else if ("abort".equals(action)) {
       return this.abort(args, callbackContext);
+    } else if("setPublicKey".equals(action)) {
+      return this.setPublicKey(args, callbackContext);
     }
 
     if (!isNetworkAvailable()) {
@@ -208,6 +220,24 @@ public class CordovaHttpPlugin extends CordovaPlugin implements Observer {
 
     cordova.getThreadPool().execute(runnable);
 
+    return true;
+  }
+
+  private boolean setPublicKey(final JSONArray args, final CallbackContext callbackContext) throws JSONException {
+    String publicKey = args.getString(0);
+    try {
+      KeyStore store = KeyStore.getInstance("AndroidCAStore");
+      String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
+      TrustManagerFactory tmf = TrustManagerFactory.getInstance(tmfAlgorithm);
+
+      store.load(null);
+      tmf.init(store);
+      X509TrustManager originalTrustManager = (X509TrustManager) tmf.getTrustManagers()[0];
+      TrustManager[] customTrustManagers = new TrustManager[]{new CustomTrustManager(originalTrustManager, publicKey)};
+      this.tlsConfiguration.setTrustManagers(customTrustManagers);
+    } catch (Exception e) {
+    Log.e(TAG, "An error occured while loading system's CA certificates", e);
+  }
     return true;
   }
 
